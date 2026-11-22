@@ -1,21 +1,46 @@
 import jwt from 'jsonwebtoken';
-import { AppError } from '../utils/AppError.js';
 
-export function autenticar(req, res, next) {
-  const [tipo, token] = (req.headers.authorization || '').split(' ');
-  if (tipo !== 'Bearer' || !token) return next(new AppError(401, 'Token requerido'));
-  try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET, {
-      algorithms: ['HS256'],
-      issuer: process.env.JWT_ISSUER,
-      audience: process.env.JWT_AUDIENCE,
-    });
-    req.user = { correo: payload.sub, rol: payload.rol };
-    next();
-  } catch {
-    next(new AppError(401, 'Token inválido o vencido'));
+const JWT_SECRET = process.env.JWT_SECRET || 'clave_secreta_ferreteria_2026';
+
+export const verificarToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Acceso denegado. Token no proporcionado.' });
   }
-}
 
-export const requerirRol = (...roles) => (req, res, next) =>
-  roles.includes(req.user.rol) ? next() : next(new AppError(403, 'No tienes permiso para esta acción'));
+  const token = authHeader.split(' ')[1];
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res.status(401).json({ error: 'Token inválido o expirado.' });
+  }
+};
+
+export const requiereRol = (...rolesPermitidos) => {
+  return (req, res, next) => {
+    if (!req.user || !rolesPermitidos.includes(req.user.rol)) {
+      return res.status(403).json({
+        error: 'Acceso prohibido. No tienes permisos suficientes para realizar esta acción.',
+      });
+    }
+    next();
+  };
+};
+
+export const verificarPropietarioOAdmin = (req, res, next) => {
+  const idSolicitado = parseInt(req.params.id, 10);
+  if (isNaN(idSolicitado)) {
+    return res.status(400).json({ error: 'El ID de usuario debe ser numérico.' });
+  }
+
+  if (req.user.rol === 'Administrador' || req.user.id === idSolicitado) {
+    return next();
+  }
+
+  return res.status(403).json({
+    error: 'Acceso prohibido. No puedes consultar ni modificar el perfil de otro usuario.',
+  });
+};
