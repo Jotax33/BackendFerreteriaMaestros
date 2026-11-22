@@ -3,10 +3,14 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { pool } from './config/db.js';
 import { manejarErrores } from './midlewares/errores.js';
+import authRoutes from './routes/authRoutes.js';
+import usuariosRoutes from './routes/usuariosRoutes.js';
+import setupSwagger from './docs/swagger.js';
 
 const app = express();
-app.use(helmet());
-app.use(cors({ origin: process.env.FRONTEND_URL }));
+
+app.use(helmet({ contentSecurityPolicy: false }));
+app.use(cors());
 app.use(express.json());
 
 app.get('/health', async (req, res) => {
@@ -14,7 +18,11 @@ app.get('/health', async (req, res) => {
   res.json({ estado: 'ok' });
 });
 
-// aquí irán las rutas (pasos 9 y 10)
+app.use('/api/auth', authRoutes);
+app.use('/api/usuarios', usuariosRoutes);
+
+setupSwagger(app);
 
 app.use(manejarErrores);
+
 export default app;
