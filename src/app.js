@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import { pool } from './config/db.js';
+import pool from './config/db.js';
 import { manejarErrores } from './midlewares/errores.js';
 import authRoutes from './routes/authRoutes.js';
 import usuariosRoutes from './routes/usuariosRoutes.js';
