@@ -2,7 +2,7 @@ import express from 'express';
 import bcrypt from 'bcrypt';
 import pool from '../config/db.js';
 import { verificarToken, requiereRol, verificarPropietarioOAdmin } from '../midlewares/auth.js';
-import { validarRegistro, validarActualizacionUsuario } from '../midlewares/validad.js';
+import { validarRegistro, validarActualizacionUsuario } from '../midlewares/validacionesauth.js';
 
 const router = express.Router();
 
@@ -197,7 +197,7 @@ router.post('/', verificarToken, requiereRol('Administrador'), validarRegistro, 
  *       404:
  *         description: Usuario no encontrado
  */
-router.put('/:id', verificarToken, verificarPropietarioOAdmin, validarActualizacionUsuario, async (req, res) => {
+router.put('/:id', verificarToken, verificarPropietarioOAdmin, async (req, res) => {
   const { nombre, email, password, rol_id, activo } = req.body;
   const idUsuario = req.params.id;
 

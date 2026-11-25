@@ -3,13 +3,14 @@ import cors from 'cors';
 import helmet from 'helmet';
 import  pool  from './config/db.js';
 import { manejarErrores } from './midlewares/errores.js';
-import authRoutes from './routes/auth.routes.js';
 import swaggerUi from 'swagger-ui-express';
 import spec from './docs/swagger.js';
+import authRoutes from './routes/authRoutes.js';
+import usuariosRoutes from './routes/usuariosRoutes.js';
 
 const app = express();
 app.use(helmet());
-app.use(cors({ origin: process.env.FRONTEND_URL }));
+app.use(cors());
 app.use(express.json());
 
 app.get('/health', async (req, res) => {

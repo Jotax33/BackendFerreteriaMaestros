@@ -2,7 +2,7 @@ import express from 'express';
 import rateLimit from 'express-rate-limit';
 import * as auth from '../services/auhServices.js';
 import { autenticar } from '../midlewares/auth.js';
-import { validarRegistro, validarLogin } from '../midlewares/validacionesAuth.js';
+import { validarRegistro, validarLogin } from '../midlewares/validacionesauth.js';
 
 const router = express.Router();
 
@@ -20,10 +20,10 @@ const limitarLogin = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10 });
  *         application/json:
  *           schema:
  *             type: object
- *             required: [nombre, correo, password]
+ *             required: [nombre, email, password]
  *             properties:
  *               nombre: { type: string, example: Juan Pérez }
- *               correo: { type: string, example: juan@correo.cl }
+ *               email: { type: string, example: juan@correo.cl }
  *               telefono: { type: string, example: "912345678" }
  *               password: { type: string, example: clave1234 }
  *     responses:
@@ -50,9 +50,9 @@ router.post('/register', validarRegistro, async (req, res) => {
  *         application/json:
  *           schema:
  *             type: object
- *             required: [correo, password]
+ *             required: [email, password]
  *             properties:
- *               correo: { type: string, example: admin@maestros.cl }
+ *               email: { type: string, example: admin@maestros.cl }
  *               password: { type: string, example: miClaveSegura }
  *     responses:
  *       200:
@@ -78,12 +78,13 @@ router.post('/login', limitarLogin, validarLogin, async (req, res) => {
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Perfil (correo, nombre, telefono, rol, activo)
+ *         description: Perfil (email, nombre, telefono, rol, activo)
  *       401:
  *         description: Token ausente, inválido o expirado
  */
 router.get('/me', autenticar, async (req, res) => {
-  res.json(await auth.perfil(req.user.correo));
+  const email = req.user.email || req.user.correo || req.user.sub;
+  res.json(await auth.perfil(email));
 });
 
 export default router;
