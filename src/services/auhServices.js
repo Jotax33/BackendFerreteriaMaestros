@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import * as repo from '../repositories/usuariosRepository.js';
-import { AppError } from '../utils/AppError.js';
+import { AppError } from '../utils/appError.js';
 
 export async function registrar({ nombre, correo, telefono, password }) {
   if (await repo.buscarPorCorreo(correo)) throw new AppError(409, 'El correo ya está registrado');

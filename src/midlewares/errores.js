@@ -6,6 +6,6 @@ export function manejarErrores(err, req, res, next) {
   }
   if (err.code === '23505') return res.status(409).json({ error: 'Registro duplicado' });
   if (err.code === '23503') return res.status(409).json({ error: 'La operación afecta registros relacionados' });
-  console.error(err.message); 
+ console.error(err);
   res.status(500).json({ error: 'Error interno del servidor' });
 }

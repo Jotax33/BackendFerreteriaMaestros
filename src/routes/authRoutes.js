@@ -1,17 +1,18 @@
 import express from 'express';
-import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
-import pool from '../config/db.js';
-import { validarRegistro } from '../midlewares/validad.js';
+import rateLimit from 'express-rate-limit';
+import * as auth from '../services/auhServices.js';
+import { autenticar } from '../midlewares/auth.js';
+import { validarRegistro, validarLogin } from '../midlewares/validacionesAuth.js';
 
 const router = express.Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'clave_secreta_ferreteria_2026';
+
+const limitarLogin = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10 });
 
 /**
  * @swagger
  * /api/auth/register:
  *   post:
- *     summary: Registrar un nuevo usuario (asigna rol Cliente registrado por defecto)
+ *     summary: Registrar un nuevo usuario (rol cliente por defecto)
  *     tags: [Autenticación]
  *     requestBody:
  *       required: true
@@ -19,17 +20,12 @@ const JWT_SECRET = process.env.JWT_SECRET || 'clave_secreta_ferreteria_2026';
  *         application/json:
  *           schema:
  *             type: object
- *             required: [nombre, email, password]
+ *             required: [nombre, correo, password]
  *             properties:
- *               nombre:
- *                 type: string
- *                 example: Juan Pérez
- *               email:
- *                 type: string
- *                 example: juan@correo.cl
- *               password:
- *                 type: string
- *                 example: clave123
+ *               nombre: { type: string, example: Juan Pérez }
+ *               correo: { type: string, example: juan@correo.cl }
+ *               telefono: { type: string, example: "912345678" }
+ *               password: { type: string, example: clave1234 }
  *     responses:
  *       201:
  *         description: Usuario registrado exitosamente
@@ -39,31 +35,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'clave_secreta_ferreteria_2026';
  *         description: El correo ya está registrado
  */
 router.post('/register', validarRegistro, async (req, res) => {
-  const { nombre, email, password } = req.body;
-  const ROL_CLIENTE_REGISTRADO = 4;
-
-  try {
-    const existe = await pool.query('SELECT id FROM usuarios WHERE email = $1', [email.toLowerCase()]);
-    if (existe.rows.length > 0) {
-      return res.status(409).json({ error: 'El correo electrónico ya está registrado.' });
-    }
-
-    const passwordHash = await bcrypt.hash(password, 10);
-    const result = await pool.query(
-      `INSERT INTO usuarios (nombre, email, password_hash, rol_id, activo)
-       VALUES ($1, $2, $3, $4, true)
-       RETURNING id, nombre, email, rol_id, activo, creado_en`,
-      [nombre.trim(), email.toLowerCase(), passwordHash, ROL_CLIENTE_REGISTRADO]
-    );
-
-    res.status(201).json({
-      mensaje: 'Usuario registrado correctamente',
-      usuario: { ...result.rows[0], rol: 'Cliente registrado' },
-    });
-  } catch (error) {
-    console.error('Error en registro:', error);
-    res.status(500).json({ error: 'Error interno del servidor.' });
-  }
+  res.status(201).json(await auth.registrar(req.body));
 });
 
 /**
@@ -78,77 +50,40 @@ router.post('/register', validarRegistro, async (req, res) => {
  *         application/json:
  *           schema:
  *             type: object
- *             required: [email, password]
+ *             required: [correo, password]
  *             properties:
- *               email:
- *                 type: string
- *                 example: admin@maestros.cl
- *               password:
- *                 type: string
- *                 example: Admin1234!
+ *               correo: { type: string, example: admin@maestros.cl }
+ *               password: { type: string, example: miClaveSegura }
  *     responses:
  *       200:
- *         description: Inicio de sesión exitoso con token JWT
+ *         description: Inicio de sesión exitoso (accessToken, tokenType, expiresIn)
  *       400:
- *         description: Faltan credenciales
+ *         description: Datos de entrada inválidos
  *       401:
- *         description: Credenciales inválidas o usuario inactivo
+ *         description: Credenciales incorrectas o usuario inactivo
+ *       429:
+ *         description: Demasiados intentos
  */
-router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
+router.post('/login', limitarLogin, validarLogin, async (req, res) => {
+  res.json(await auth.login(req.body));
+});
 
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Debe ingresar correo y contraseña.' });
-  }
-
-  try {
-    const query = `
-      SELECT u.id, u.nombre, u.email, u.password_hash, u.activo, u.rol_id, r.nombre AS rol
-      FROM usuarios u
-      JOIN roles r ON u.rol_id = r.id
-      WHERE u.email = $1
-    `;
-    const result = await pool.query(query, [email.toLowerCase()]);
-
-    if (result.rows.length === 0) {
-      return res.status(401).json({ error: 'Credenciales inválidas.' });
-    }
-
-    const usuario = result.rows[0];
-
-    if (!usuario.activo) {
-      return res.status(401).json({ error: 'La cuenta se encuentra desactivada.' });
-    }
-
-    const passwordValida = await bcrypt.compare(password, usuario.password_hash);
-    if (!passwordValida) {
-      return res.status(401).json({ error: 'Credenciales inválidas.' });
-    }
-
-    const payload = {
-      id: usuario.id,
-      email: usuario.email,
-      rol: usuario.rol,
-      rol_id: usuario.rol_id,
-    };
-
-    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '4h' });
-
-    res.status(200).json({
-      mensaje: 'Inicio de sesión exitoso',
-      token,
-      usuario: {
-        id: usuario.id,
-        nombre: usuario.nombre,
-        email: usuario.email,
-        rol: usuario.rol,
-        rol_id: usuario.rol_id,
-      },
-    });
-  } catch (error) {
-    console.error('Error en login:', error);
-    res.status(500).json({ error: 'Error interno del servidor.' });
-  }
+/**
+ * @swagger
+ * /api/auth/me:
+ *   get:
+ *     summary: Perfil del usuario autenticado
+ *     tags: [Autenticación]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Perfil (correo, nombre, telefono, rol, activo)
+ *       401:
+ *         description: Token ausente, inválido o expirado
+ */
+router.get('/me', autenticar, async (req, res) => {
+  res.json(await auth.perfil(req.user.correo));
 });
 
 export default router;
