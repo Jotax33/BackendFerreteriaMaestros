@@ -18,8 +18,9 @@ app.get('/health', async (req, res) => {
   res.json({ estado: 'ok' });
 });
 
-// aquí irán las rutas (pasos 9 y 10)
+
 app.use('/api/auth', authRoutes);
+app.use('/api/usuarios', usuariosRoutes);
 app.use(manejarErrores);
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(spec));

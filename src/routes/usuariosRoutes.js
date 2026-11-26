@@ -1,5 +1,5 @@
 import express from 'express';
-import * as usuarios from '../services/usuariosServices.js';
+import * as usuarios from '../services/usuariosService.js';
 import { autenticar, requiereRol, verificarPropietarioOAdmin } from '../midlewares/auth.js';
 import { validarActualizacionUsuario } from '../midlewares/validacionesUsuarios.js';
 
